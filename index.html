@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bible Quiz — 20 Questions • 10s Timer</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    :root { color-scheme: dark; }
+    .glass { background: rgba(255,255,255,0.06); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.10); }
+    .btn { transition: transform .08s ease, filter .12s ease, background-color .12s ease, border-color .12s ease; }
+    .btn:active { transform: translateY(1px) scale(0.99); }
+    .shake { animation: shake 420ms ease-in-out; }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-6px); }
+      40% { transform: translateX(6px); }
+      60% { transform: translateX(-4px); }
+      80% { transform: translateX(4px); }
+    }
+    .pop { animation: pop 260ms ease-out; }
+    @keyframes pop {
+      0% { transform: scale(0.98); filter: saturate(1); }
+      70% { transform: scale(1.02); filter: saturate(1.2); }
+      100% { transform: scale(1); filter: saturate(1); }
+    }
+    .pulseGlow { animation: pulseGlow 800ms ease-out; }
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 0 0 rgba(34,197,94,0.0); }
+      40% { box-shadow: 0 0 0 6px rgba(34,197,94,0.18); }
+      100% { box-shadow: 0 0 0 rgba(34,197,94,0.0); }
+    }
+    .mono { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950 text-slate-100">
+  <canvas id="confetti" class="fixed inset-0 pointer-events-none"></canvas>
+
+  <main class="max-w-3xl mx-auto px-4 py-10">
+    <header class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight">Bible Quiz</h1>
+        <p class="text-slate-300 mt-1">20 complicated questions • <span class="mono">10.0s</span> per question • sound + effects</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="soundBtn" class="btn glass rounded-xl px-4 py-2 text-sm hover:bg-white/10" aria-pressed="true">
+          Sound: <span id="soundLabel" class="font-semibold">On</span>
+        </button>
+        <button id="helpBtn" class="btn glass rounded-xl px-4 py-2 text-sm hover:bg-white/10">Help</button>
+      </div>
+    </header>
+
+    <section id="card" class="glass rounded-2xl p-5 sm:p-6 mt-6">
+      <!-- START SCREEN -->
+      <div id="startView" class="">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-semibold">Ready?</h2>
+            <p class="text-slate-300 mt-2 leading-relaxed">
+              You’ll get one question at a time. Pick an option before the timer hits zero.
+              When time runs out, it counts as incorrect and the quiz advances.
+            </p>
+          </div>
+          <div class="hidden sm:block text-right">
+            <div class="text-sm text-slate-300">Difficulty</div>
+            <div class="text-base font-semibold">Complicated</div>
+          </div>
+        </div>
+
+        <div class="mt-5 grid sm:grid-cols-3 gap-3">
+          <div class="rounded-xl bg-white/5 border border-white/10 p-4">
+            <div class="text-sm text-slate-300">Questions</div>
+            <div class="text-lg font-semibold">20</div>
+          </div>
+          <div class="rounded-xl bg-white/5 border border-white/10 p-4">
+            <div class="text-sm text-slate-300">Timer</div>
+            <div class="text-lg font-semibold mono">10 seconds</div>
+          </div>
+          <div class="rounded-xl bg-white/5 border border-white/10 p-4">
+            <div class="text-sm text-slate-300">Scoring</div>
+            <div class="text-lg font-semibold">+1 correct</div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+          <button id="startBtn" class="btn rounded-xl px-5 py-3 font-semibold bg-indigo-500 hover:bg-indigo-400 text-white">
+            Start Quiz
+          </button>
+          <div class="text-sm text-slate-300">
+            Tip: Click anywhere once to enable audio if your browser blocks it.
+          </div>
+        </div>
+      </div>
+
+      <!-- QUIZ SCREEN -->
+      <div id="quizView" class="hidden">
+        <div class="flex flex-col gap-3">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div class="flex items-center gap-3">
+              <div class="text-sm text-slate-300">Progress</div>
+              <div class="font-semibold"><span id="qNum">1</span>/<span id="qTotal">20</span></div>
+              <div class="h-4 w-px bg-white/15"></div>
+              <div class="text-sm text-slate-300">Score</div>
+              <div class="font-semibold"><span id="score">0</span></div>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="text-sm text-slate-300">Time</div>
+              <div id="timeLeft" class="mono font-semibold">10.0s</div>
+            </div>
+          </div>
+
+          <div class="rounded-xl overflow-hidden border border-white/10 bg-white/5">
+            <div class="h-2 bg-white/5">
+              <div id="timeBar" class="h-2 bg-emerald-400/90" style="width: 100%"></div>
+            </div>
+            <div class="p-4 sm:p-5">
+              <div class="text-xs uppercase tracking-wide text-slate-400">Question</div>
+              <h3 id="questionText" class="mt-1 text-lg sm:text-xl font-semibold leading-snug"></h3>
+              <div id="questionMeta" class="mt-2 text-sm text-slate-300"></div>
+
+              <div id="options" class="mt-4 grid gap-2"></div>
+
+              <div id="feedback" class="mt-4 hidden rounded-xl border p-3 text-sm"></div>
+
+              <div class="mt-4 flex items-center justify-between gap-3">
+                <button id="quitBtn" class="btn rounded-xl px-4 py-2 text-sm bg-white/5 hover:bg-white/10 border border-white/10">Quit</button>
+                <div class="flex items-center gap-2">
+                  <button id="nextBtn" class="btn rounded-xl px-4 py-2 text-sm font-semibold bg-indigo-500 hover:bg-indigo-400 text-white hidden">Next</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- END SCREEN -->
+      <div id="endView" class="hidden">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-semibold">Results</h2>
+            <p id="resultLine" class="text-slate-300 mt-2"></p>
+          </div>
+          <div class="text-right">
+            <div class="text-sm text-slate-300">Final score</div>
+            <div class="text-2xl font-semibold"><span id="finalScore">0</span><span class="text-slate-400 text-base">/20</span></div>
+          </div>
+        </div>
+
+        <div class="mt-5 grid sm:grid-cols-3 gap-3">
+          <div class="rounded-xl bg-white/5 border border-white/10 p-4">
+            <div class="text-sm text-slate-300">Correct</div>
+            <div class="text-lg font-semibold" id="correctCount">0</div>
+          </div>
+          <div class="rounded-xl bg-white/5 border border-white/10 p-4">
+            <div class="text-sm text-slate-300">Wrong / Timeout</div>
+            <div class="text-lg font-semibold" id="wrongCount">0</div>
+          </div>
+          <div class="rounded-xl bg-white/5 border border-white/10 p-4">
+            <div class="text-sm text-slate-300">Average time</div>
+            <div class="text-lg font-semibold mono" id="avgTime">—</div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+          <div class="flex gap-2">
+            <button id="restartBtn" class="btn rounded-xl px-5 py-3 font-semibold bg-indigo-500 hover:bg-indigo-400 text-white">Restart</button>
+            <button id="reviewBtn" class="btn rounded-xl px-5 py-3 font-semibold bg-white/5 hover:bg-white/10 border border-white/10">Toggle Review</button>
+          </div>
+          <div class="text-sm text-slate-300">Tip: Turn sound on for better feedback.</div>
+        </div>
+
+        <div id="review" class="hidden mt-5">
+          <h3 class="text-base font-semibold">Review</h3>
+          <div id="reviewList" class="mt-3 grid gap-3"></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="mt-6 text-xs text-slate-400 leading-relaxed">
+      Notes: Questions are designed to be challenging and text-based. Sound is generated in-browser (no downloads). Some browsers require a user gesture to enable audio.
+    </footer>
+  </main>
+
+  <!-- HELP MODAL -->
+  <div id="modal" class="hidden fixed inset-0 z-50">
+    <div class="absolute inset-0 bg-black/60"></div>
+    <div class="relative max-w-lg mx-auto mt-16 sm:mt-24 p-4">
+      <div class="glass rounded-2xl p-5 border border-white/10">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <div class="text-lg font-semibold">How it works</div>
+            <div class="text-slate-300 text-sm mt-1">20 questions, each with 4 options. You have 10 seconds per question.</div>
+          </div>
+          <button id="closeModal" class="btn rounded-xl px-3 py-2 text-sm bg-white/5 hover:bg-white/10 border border-white/10">Close</button>
+        </div>
+        <ul class="mt-4 text-sm text-slate-200 list-disc pl-5 space-y-2">
+          <li><span class="font-semibold">Correct</span> answers glow green (and may trigger confetti).</li>
+          <li><span class="font-semibold">Wrong</span> answers shake the card.</li>
+          <li><span class="font-semibold">Timeout</span> counts as incorrect and advances automatically.</li>
+          <li>Audio is optional and can be toggled.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ------------------------
+    // Question bank (20)
+    // ------------------------
+    const QUESTIONS = [
+      {
+        q: "In which Pauline letter is Habakkuk 2:4 quoted specifically to argue that justification is not by the Law, immediately contrasted with ‘the law is not of faith’ (Hab 2:4 + Lev 18:5)?",
+        meta: "See Galatians 3:11–12",
+        options: ["Romans", "Galatians", "Hebrews", "James"],
+        answer: 1,
+        why: "Galatians 3:11–12 quotes Hab 2:4 and contrasts it with Lev 18:5 to argue justification is not by the Law."
+      },
+      {
+        q: "According to Mark’s account, which high priest is mentioned when Jesus references David eating the bread of the Presence?",
+        meta: "Mark 2:26 (contrast 1 Samuel 21)",
+        options: ["Abiathar", "Ahimelech", "Zadok", "Eli"],
+        answer: 0,
+        why: "Mark 2:26 says ‘in the days of Abiathar the high priest’ (even though 1 Sam 21 names Ahimelech)."
+      },
+      {
+        q: "When Sennacherib threatened Jerusalem, which Assyrian official acted as the chief spokesman and addressed the people at the wall (even in Judean/Hebrew)?",
+        meta: "2 Kings 18:26–28",
+        options: ["The Tartan", "The Rabshakeh", "The Rabsaris", "The Vizier"],
+        answer: 1,
+        why: "The Rabshakeh delivers the speech at the wall and speaks so the people can understand."
+      },
+      {
+        q: "In Genesis 14, who is described as both ‘king of Salem’ and ‘priest of God Most High,’ blessing Abram and receiving a tenth?",
+        meta: "Genesis 14:18–20",
+        options: ["Abimelech", "Melchizedek", "Jethro", "Balaam"],
+        answer: 1,
+        why: "Genesis 14:18–20 identifies Melchizedek as king of Salem and priest of God Most High."
+      },
+      {
+        q: "Balaam’s oracle containing ‘A star shall come out of Jacob’ belongs to which numbered oracle in Numbers 24?",
+        meta: "Numbers 24:15–19",
+        options: ["First", "Second", "Third", "Fourth"],
+        answer: 3,
+        why: "The ‘star out of Jacob’ appears in Balaam’s fourth oracle (Num 24:15–19)."
+      },
+      {
+        q: "Which king cut up and burned Jeremiah’s scroll as it was read to him, prompting Jeremiah to dictate another scroll with added words?",
+        meta: "Jeremiah 36",
+        options: ["Jehoiachin", "Jehoiakim", "Zedekiah", "Josiah"],
+        answer: 1,
+        why: "Jeremiah 36 describes King Jehoiakim burning the scroll section by section."
+      },
+      {
+        q: "Who privately explained ‘the way of God more accurately’ to Apollos after hearing him speak boldly in the synagogue at Ephesus?",
+        meta: "Acts 18:24–26",
+        options: ["Paul and Barnabas", "Priscilla and Aquila", "Silas and Timothy", "Peter and John"],
+        answer: 1,
+        why: "Acts 18:26 says Priscilla and Aquila took Apollos aside and explained more accurately."
+      },
+      {
+        q: "In 1 Corinthians 10, Paul says the Israelites drank from a spiritual Rock that followed them—what does he identify that Rock as?",
+        meta: "1 Corinthians 10:4",
+        options: ["The Law", "An angel", "Christ", "The temple"],
+        answer: 2,
+        why: "1 Corinthians 10:4: ‘the Rock was Christ.’"
+      },
+      {
+        q: "When Uzzah was struck down for touching the ark, from whose house was the ark being brought on a new cart?",
+        meta: "2 Samuel 6:3–7",
+        options: ["Obed-edom", "Abinadab", "Araunah", "Nabal"],
+        answer: 1,
+        why: "The ark was brought from the house of Abinadab; Uzzah and Ahio drove the cart."
+      },
+      {
+        q: "In Exodus 31, who is named first as being filled with the Spirit of God for craftsmanship (tabernacle work), before Oholiab is mentioned?",
+        meta: "Exodus 31:1–6",
+        options: ["Bezalel son of Uri", "Huram of Tyre", "Hiram son of a widow", "Aholiab son of Ahisamach"],
+        answer: 0,
+        why: "Exodus 31 names Bezalel first, then associates Oholiab as his assistant."
+      },
+      {
+        q: "In Luke 24, how far from Jerusalem is the village where two disciples walked with the risen Jesus (as stated in ‘stadia’)?",
+        meta: "Luke 24:13",
+        options: ["30 stadia", "60 stadia", "120 stadia", "160 stadia"],
+        answer: 1,
+        why: "Luke 24:13 says Emmaus was about 60 stadia from Jerusalem."
+      },
+      {
+        q: "According to Hebrews 7, what meaning is explicitly attached to the name ‘Melchizedek’?",
+        meta: "Hebrews 7:2",
+        options: ["King of peace", "King of righteousness", "Servant of the Most High", "Priest of the covenant"],
+        answer: 1,
+        why: "Hebrews 7:2: ‘first… king of righteousness’ (then ‘king of Salem… king of peace’)."
+      },
+      {
+        q: "Paul says he was lowered in a basket through a window in the wall at Damascus—this was under an ethnarch of which king?",
+        meta: "2 Corinthians 11:32–33",
+        options: ["Herod Agrippa I", "Caesar Augustus", "King Aretas", "Nero"],
+        answer: 2,
+        why: "2 Corinthians 11:32 mentions an ethnarch under King Aretas guarding the city."
+      },
+      {
+        q: "In 1 Kings 19, Elijah hears ‘a low whisper’ (or gentle voice) after which sequence reaches its final phenomenon just before the whisper?",
+        meta: "1 Kings 19:11–12",
+        options: ["After the wind", "After the earthquake", "After the fire", "After the rain"],
+        answer: 2,
+        why: "The text lists wind, earthquake, fire—then the sound of a low whisper."
+      },
+      {
+        q: "In Zechariah 4, the two olive trees (the ‘two anointed ones’) most directly correspond in that historical setting to which pair?",
+        meta: "Zechariah 4:14 (post-exile leadership)",
+        options: ["Ezra and Nehemiah", "Zerubbabel and Joshua", "Elijah and Elisha", "Moses and Aaron"],
+        answer: 1,
+        why: "In context, the restored community’s leaders are Zerubbabel (governor) and Joshua (high priest)."
+      },
+      {
+        q: "In John 18, Peter’s third denial is prompted by a question from a person described as what relation to Malchus (whose ear Peter had cut off)?",
+        meta: "John 18:26",
+        options: ["His brother", "His cousin", "His relative", "His servant"],
+        answer: 2,
+        why: "John 18:26: ‘One of the servants… a relative of the man whose ear Peter had cut off…’"
+      },
+      {
+        q: "In Deuteronomy 32:8 (Song of Moses), the Most High fixed the boundaries of the peoples according to the number of what (as in many traditional translations)?",
+        meta: "Deuteronomy 32:8 (wording varies by manuscript tradition)",
+        options: ["the sons of Israel", "the tribes of Canaan", "the kings of the earth", "the angels of the nations"],
+        answer: 0,
+        why: "Many common translations read ‘according to the number of the sons of Israel.’"
+      },
+      {
+        q: "In Esther 3, Haman cast lots to choose the day of destruction—what is the name of that lot?",
+        meta: "Esther 3:7",
+        options: ["Urim", "Thummim", "Pur", "Goral"],
+        answer: 2,
+        why: "Esther 3:7 calls the lot ‘Pur’ (hence ‘Purim’)."
+      },
+      {
+        q: "In Matthew 2, when the Magi arrive, they find the child with Mary not in a stable but in what location?",
+        meta: "Matthew 2:11",
+        options: ["A house", "An inn", "A cave", "A shepherd’s field"],
+        answer: 0,
+        why: "Matthew 2:11: ‘going into the house, they saw the child…’"
+      },
+      {
+        q: "In Philippians 4:22, Paul highlights greetings from a particular group—‘especially’ those belonging to what household?",
+        meta: "Philippians 4:22",
+        options: ["Herod’s household", "Caesar’s household", "Lydia’s household", "Chloe’s household"],
+        answer: 1,
+        why: "Philippians 4:22: ‘especially those of Caesar’s household.’"
+      }
+    ];
+
+    // ------------------------
+    // State
+    // ------------------------
+    const state = {
+      idx: 0,
+      score: 0,
+      answers: [], // { picked: number|null, correct: number, msSpent: number, result: 'correct'|'wrong'|'timeout' }
+      running: false,
+      locked: false,
+      deadline: 0,
+      timerId: null,
+      tickId: null,
+      perQuestionMs: 10_000,
+      soundOn: true,
+      audioReady: false,
+      audio: null,
+    };
+
+    // ------------------------
+    // Elements
+    // ------------------------
+    const el = {
+      card: document.getElementById('card'),
+      startView: document.getElementById('startView'),
+      quizView: document.getElementById('quizView'),
+      endView: document.getElementById('endView'),
+      startBtn: document.getElementById('startBtn'),
+      nextBtn: document.getElementById('nextBtn'),
+      quitBtn: document.getElementById('quitBtn'),
+      soundBtn: document.getElementById('soundBtn'),
+      soundLabel: document.getElementById('soundLabel'),
+      helpBtn: document.getElementById('helpBtn'),
+      modal: document.getElementById('modal'),
+      closeModal: document.getElementById('closeModal'),
+
+      qNum: document.getElementById('qNum'),
+      qTotal: document.getElementById('qTotal'),
+      score: document.getElementById('score'),
+      timeLeft: document.getElementById('timeLeft'),
+      timeBar: document.getElementById('timeBar'),
+      questionText: document.getElementById('questionText'),
+      questionMeta: document.getElementById('questionMeta'),
+      options: document.getElementById('options'),
+      feedback: document.getElementById('feedback'),
+
+      finalScore: document.getElementById('finalScore'),
+      correctCount: document.getElementById('correctCount'),
+      wrongCount: document.getElementById('wrongCount'),
+      avgTime: document.getElementById('avgTime'),
+      resultLine: document.getElementById('resultLine'),
+      restartBtn: document.getElementById('restartBtn'),
+      reviewBtn: document.getElementById('reviewBtn'),
+      review: document.getElementById('review'),
+      reviewList: document.getElementById('reviewList'),
+
+      confetti: document.getElementById('confetti'),
+    };
+
+    el.qTotal.textContent = String(QUESTIONS.length);
+
+    // ------------------------
+    // Audio (WebAudio)
+    // ------------------------
+    function ensureAudio() {
+      if (state.audioReady) return;
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        state.audio = new Ctx();
+        state.audioReady = true;
+      } catch (e) {
+        state.audioReady = false;
+      }
+    }
+
+    function playTone(freq, ms, type = 'sine', gain = 0.04) {
+      if (!state.soundOn) return;
+      ensureAudio();
+      if (!state.audioReady) return;
+      const ctx = state.audio;
+      if (ctx.state === 'suspended') ctx.resume();
+
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = type;
+      o.frequency.value = freq;
+      g.gain.value = 0.0001;
+      o.connect(g);
+      g.connect(ctx.destination);
+
+      const now = ctx.currentTime;
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(gain, now + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + ms / 1000);
+
+      o.start(now);
+      o.stop(now + ms / 1000 + 0.02);
+    }
+
+    function sfxClick() { playTone(720, 45, 'square', 0.025); }
+    function sfxCorrect() {
+      // quick ascending triad
+      playTone(523.25, 90, 'sine', 0.05);
+      setTimeout(() => playTone(659.25, 90, 'sine', 0.05), 70);
+      setTimeout(() => playTone(783.99, 110, 'sine', 0.05), 140);
+    }
+    function sfxWrong() {
+      playTone(160, 160, 'sawtooth', 0.05);
+      setTimeout(() => playTone(120, 180, 'sawtooth', 0.05), 120);
+    }
+    function sfxTimeout() {
+      playTone(880, 90, 'square', 0.04);
+      setTimeout(() => playTone(880, 90, 'square', 0.04), 140);
+      setTimeout(() => playTone(880, 120, 'square', 0.04), 280);
+    }
+
+    // ------------------------
+    // Confetti
+    // ------------------------
+    const conf = {
+      ctx: null,
+      w: 0,
+      h: 0,
+      pieces: [],
+      raf: 0,
+    };
+
+    function resizeConfetti() {
+      conf.w = el.confetti.width = window.innerWidth * devicePixelRatio;
+      conf.h = el.confetti.height = window.innerHeight * devicePixelRatio;
+      if (!conf.ctx) conf.ctx = el.confetti.getContext('2d');
+    }
+
+    function confettiBurst(count = 90) {
+      resizeConfetti();
+      const colors = ['#22c55e', '#60a5fa', '#a78bfa', '#f472b6', '#fbbf24'];
+      for (let i = 0; i < count; i++) {
+        conf.pieces.push({
+          x: (window.innerWidth * 0.5 + (Math.random() - 0.5) * 180) * devicePixelRatio,
+          y: (window.innerHeight * 0.24 + (Math.random() - 0.5) * 80) * devicePixelRatio,
+          vx: (Math.random() - 0.5) * 9 * devicePixelRatio,
+          vy: (Math.random() * -9 - 3) * devicePixelRatio,
+          g: (0.28 + Math.random() * 0.18) * devicePixelRatio,
+          s: (4 + Math.random() * 6) * devicePixelRatio,
+          r: Math.random() * Math.PI,
+          vr: (Math.random() - 0.5) * 0.22,
+          life: 120 + Math.random() * 50,
+          color: colors[(Math.random() * colors.length) | 0],
+        });
+      }
+      if (!conf.raf) animateConfetti();
+    }
+
+    function animateConfetti() {
+      conf.raf = requestAnimationFrame(animateConfetti);
+      const ctx = conf.ctx;
+      ctx.clearRect(0, 0, conf.w, conf.h);
+      conf.pieces = conf.pieces.filter(p => p.life > 0);
+      for (const p of conf.pieces) {
+        p.life -= 1;
+        p.vy += p.g;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.r += p.vr;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.r);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.min(1, p.life / 80);
+        ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6);
+        ctx.restore();
+      }
+      if (conf.pieces.length === 0) {
+        cancelAnimationFrame(conf.raf);
+        conf.raf = 0;
+        ctx.clearRect(0, 0, conf.w, conf.h);
+      }
+    }
+
+    window.addEventListener('resize', resizeConfetti);
+
+    // ------------------------
+    // Utilities
+    // ------------------------
+    const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+
+    function show(view) {
+      el.startView.classList.toggle('hidden', view !== 'start');
+      el.quizView.classList.toggle('hidden', view !== 'quiz');
+      el.endView.classList.toggle('hidden', view !== 'end');
+    }
+
+    function setSound(on) {
+      state.soundOn = !!on;
+      localStorage.setItem('bibleQuizSoundOn', state.soundOn ? '1' : '0');
+      el.soundLabel.textContent = state.soundOn ? 'On' : 'Off';
+      el.soundBtn.setAttribute('aria-pressed', String(state.soundOn));
+    }
+
+    function loadSoundPref() {
+      const v = localStorage.getItem('bibleQuizSoundOn');
+      if (v === null) return;
+      setSound(v === '1');
+    }
+
+    function setFeedback(kind, html) {
+      el.feedback.classList.remove('hidden');
+      el.feedback.classList.remove('border-emerald-400/30', 'bg-emerald-500/10', 'text-emerald-100');
+      el.feedback.classList.remove('border-rose-400/30', 'bg-rose-500/10', 'text-rose-100');
+      el.feedback.classList.remove('border-amber-400/30', 'bg-amber-500/10', 'text-amber-100');
+
+      if (kind === 'correct') {
+        el.feedback.classList.add('border-emerald-400/30', 'bg-emerald-500/10', 'text-emerald-100');
+      } else if (kind === 'wrong') {
+        el.feedback.classList.add('border-rose-400/30', 'bg-rose-500/10', 'text-rose-100');
+      } else {
+        el.feedback.classList.add('border-amber-400/30', 'bg-amber-500/10', 'text-amber-100');
+      }
+      el.feedback.innerHTML = html;
+    }
+
+    function clearFeedback() {
+      el.feedback.classList.add('hidden');
+      el.feedback.innerHTML = '';
+    }
+
+    function stopTimers() {
+      if (state.tickId) { clearInterval(state.tickId); state.tickId = null; }
+      if (state.timerId) { clearTimeout(state.timerId); state.timerId = null; }
+    }
+
+    function setTimeUI(msLeft) {
+      const t = clamp(msLeft, 0, state.perQuestionMs);
+      el.timeLeft.textContent = (t / 1000).toFixed(1) + 's';
+      const pct = (t / state.perQuestionMs) * 100;
+      el.timeBar.style.width = pct + '%';
+
+      // color shift
+      if (pct > 55) {
+        el.timeBar.className = 'h-2 bg-emerald-400/90';
+      } else if (pct > 25) {
+        el.timeBar.className = 'h-2 bg-amber-400/90';
+      } else {
+        el.timeBar.className = 'h-2 bg-rose-400/90';
+      }
+    }
+
+    function lockOptions(lock) {
+      state.locked = lock;
+      [...el.options.querySelectorAll('button[data-opt]')].forEach(b => {
+        b.disabled = lock;
+        b.classList.toggle('opacity-80', lock);
+        b.classList.toggle('cursor-not-allowed', lock);
+      });
+    }
+
+    function renderQuestion() {
+      const q = QUESTIONS[state.idx];
+      el.qNum.textContent = String(state.idx + 1);
+      el.score.textContent = String(state.score);
+      el.questionText.textContent = q.q;
+      el.questionMeta.textContent = q.meta || '';
+
+      clearFeedback();
+      el.nextBtn.classList.add('hidden');
+
+      el.options.innerHTML = '';
+      q.options.forEach((opt, i) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.opt = String(i);
+        btn.className = 'btn text-left rounded-xl px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 focus:outline-none focus:ring-2 focus:ring-indigo-400/60';
+        btn.innerHTML = `
+          <div class="flex items-start gap-3">
+            <div class="mt-0.5 h-6 w-6 rounded-lg bg-white/10 border border-white/10 flex items-center justify-center text-xs font-semibold">${String.fromCharCode(65+i)}</div>
+            <div class="leading-snug">${opt}</div>
+          </div>
+        `;
+        btn.addEventListener('click', () => choose(i));
+        el.options.appendChild(btn);
+      });
+
+      // start timing
+      state.locked = false;
+      lockOptions(false);
+
+      state.deadline = performance.now() + state.perQuestionMs;
+      setTimeUI(state.perQuestionMs);
+      stopTimers();
+
+      // smooth tick
+      state.tickId = setInterval(() => {
+        const msLeft = state.deadline - performance.now();
+        setTimeUI(msLeft);
+      }, 50);
+
+      // hard timeout
+      state.timerId = setTimeout(() => {
+        onTimeout();
+      }, state.perQuestionMs + 30);
+    }
+
+    function highlightAnswers(pickedIndex) {
+      const q = QUESTIONS[state.idx];
+      const btns = [...el.options.querySelectorAll('button[data-opt]')];
+      btns.forEach((b, i) => {
+        b.classList.remove('border-emerald-400/50', 'bg-emerald-500/10');
+        b.classList.remove('border-rose-400/50', 'bg-rose-500/10');
+        b.classList.remove('border-indigo-400/60');
+
+        if (i === q.answer) {
+          b.classList.add('border-emerald-400/50', 'bg-emerald-500/10');
+        }
+        if (pickedIndex != null && i === pickedIndex && i !== q.answer) {
+          b.classList.add('border-rose-400/50', 'bg-rose-500/10');
+        }
+        if (pickedIndex != null && i === pickedIndex) {
+          b.classList.add('border-indigo-400/60');
+        }
+      });
+    }
+
+    function choose(picked) {
+      if (!state.running || state.locked) return;
+      sfxClick();
+      finalizeAnswer(picked);
+    }
+
+    function onTimeout() {
+      if (!state.running || state.locked) return;
+      finalizeAnswer(null, true);
+    }
+
+    function finalizeAnswer(picked, timedOut = false) {
+      state.locked = true;
+      lockOptions(true);
+      stopTimers();
+
+      const q = QUESTIONS[state.idx];
+      const msSpent = clamp(state.perQuestionMs - (state.deadline - performance.now()), 0, state.perQuestionMs);
+
+      const correct = q.answer;
+      let result;
+      if (timedOut) result = 'timeout';
+      else if (picked === correct) result = 'correct';
+      else result = 'wrong';
+
+      if (result === 'correct') state.score += 1;
+      el.score.textContent = String(state.score);
+
+      state.answers.push({ picked, correct, msSpent, result });
+
+      highlightAnswers(picked);
+
+      if (result === 'correct') {
+        el.card.classList.remove('shake');
+        el.card.classList.add('pop', 'pulseGlow');
+        setTimeout(() => el.card.classList.remove('pop', 'pulseGlow'), 900);
+        setFeedback('correct', `<div class="font-semibold">Correct.</div><div class="mt-1 text-slate-100/90">${q.why}</div>`);
+        sfxCorrect();
+        confettiBurst(70);
+      } else if (result === 'wrong') {
+        el.card.classList.remove('shake');
+        void el.card.offsetWidth;
+        el.card.classList.add('shake');
+        setFeedback('wrong', `<div class="font-semibold">Wrong.</div><div class="mt-1">Correct answer: <span class="font-semibold">${q.options[correct]}</span></div><div class="mt-1 text-slate-100/90">${q.why}</div>`);
+        sfxWrong();
+      } else {
+        el.card.classList.remove('shake');
+        void el.card.offsetWidth;
+        el.card.classList.add('shake');
+        setFeedback('timeout', `<div class="font-semibold">Time’s up.</div><div class="mt-1">Correct answer: <span class="font-semibold">${q.options[correct]}</span></div><div class="mt-1 text-slate-100/90">${q.why}</div>`);
+        sfxTimeout();
+      }
+
+      el.nextBtn.classList.remove('hidden');
+      setTimeUI(0);
+
+      // auto-advance after a moment (keeps pace)
+      setTimeout(() => {
+        if (!state.running) return;
+        if (state.idx < QUESTIONS.length - 1) {
+          next();
+        } else {
+          finish();
+        }
+      }, 1500);
+    }
+
+    function next() {
+      if (!state.running) return;
+      if (state.idx >= QUESTIONS.length - 1) { finish(); return; }
+      state.idx += 1;
+      renderQuestion();
+    }
+
+    function finish() {
+      state.running = false;
+      stopTimers();
+      show('end');
+
+      const correct = state.score;
+      const wrong = QUESTIONS.length - correct;
+      el.finalScore.textContent = String(correct);
+      el.correctCount.textContent = String(correct);
+      el.wrongCount.textContent = String(wrong);
+
+      const avg = state.answers.length
+        ? (state.answers.reduce((a, x) => a + x.msSpent, 0) / state.answers.length)
+        : 0;
+      el.avgTime.textContent = state.answers.length ? (avg / 1000).toFixed(2) + 's' : '—';
+
+      const pct = Math.round((correct / QUESTIONS.length) * 100);
+      let msg;
+      if (pct >= 90) msg = "Excellent—deep familiarity with the text.";
+      else if (pct >= 70) msg = "Strong—these were intentionally tricky.";
+      else if (pct >= 50) msg = "Decent—review the missed ones below.";
+      else msg = "Tough set—use the review to learn the references.";
+      el.resultLine.textContent = `${pct}% (${correct}/${QUESTIONS.length}). ${msg}`;
+
+      buildReview();
+
+      if (correct >= 16) confettiBurst(160);
+    }
+
+    function buildReview() {
+      el.reviewList.innerHTML = '';
+      state.answers.forEach((a, i) => {
+        const q = QUESTIONS[i];
+        const pickedText = a.picked == null ? '— (timeout)' : q.options[a.picked];
+        const correctText = q.options[a.correct];
+        const isOk = a.result === 'correct';
+
+        const item = document.createElement('div');
+        item.className = `rounded-xl border p-4 ${isOk ? 'border-emerald-400/25 bg-emerald-500/5' : 'border-rose-400/25 bg-rose-500/5'}`;
+        item.innerHTML = `
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <div class="text-xs uppercase tracking-wide text-slate-400">Q${i+1} • ${q.meta || ''}</div>
+              <div class="mt-1 font-semibold leading-snug">${q.q}</div>
+            </div>
+            <div class="text-xs mono text-slate-300 whitespace-nowrap">${(a.msSpent/1000).toFixed(1)}s</div>
+          </div>
+          <div class="mt-3 grid sm:grid-cols-2 gap-2 text-sm">
+            <div class="rounded-lg bg-white/5 border border-white/10 p-3">
+              <div class="text-slate-300 text-xs">Your answer</div>
+              <div class="mt-1 ${isOk ? 'text-emerald-100 font-semibold' : 'text-rose-100 font-semibold'}">${pickedText}</div>
+            </div>
+            <div class="rounded-lg bg-white/5 border border-white/10 p-3">
+              <div class="text-slate-300 text-xs">Correct answer</div>
+              <div class="mt-1 text-emerald-100 font-semibold">${correctText}</div>
+            </div>
+          </div>
+          <div class="mt-3 text-sm text-slate-200/90">${q.why}</div>
+        `;
+        el.reviewList.appendChild(item);
+      });
+    }
+
+    function start() {
+      // restart state
+      state.idx = 0;
+      state.score = 0;
+      state.answers = [];
+      state.running = true;
+      state.locked = false;
+
+      show('quiz');
+      renderQuestion();
+    }
+
+    function quit() {
+      state.running = false;
+      stopTimers();
+      show('start');
+      clearFeedback();
+      el.options.innerHTML = '';
+      el.nextBtn.classList.add('hidden');
+      setTimeUI(state.perQuestionMs);
+      el.timeLeft.textContent = '10.0s';
+    }
+
+    // ------------------------
+    // Events
+    // ------------------------
+    loadSoundPref();
+
+    document.addEventListener('pointerdown', () => {
+      // helps enable audio on first gesture
+      ensureAudio();
+      if (state.audioReady && state.audio.state === 'suspended') state.audio.resume();
+    }, { once: true });
+
+    el.startBtn.addEventListener('click', () => {
+      ensureAudio();
+      sfxClick();
+      start();
+    });
+
+    el.nextBtn.addEventListener('click', () => {
+      sfxClick();
+      if (state.idx < QUESTIONS.length - 1) next();
+      else finish();
+    });
+
+    el.quitBtn.addEventListener('click', () => {
+      sfxClick();
+      quit();
+    });
+
+    el.restartBtn.addEventListener('click', () => {
+      sfxClick();
+      show('start');
+    });
+
+    el.reviewBtn.addEventListener('click', () => {
+      sfxClick();
+      el.review.classList.toggle('hidden');
+    });
+
+    el.soundBtn.addEventListener('click', () => {
+      ensureAudio();
+      setSound(!state.soundOn);
+      sfxClick();
+    });
+
+    el.helpBtn.addEventListener('click', () => {
+      sfxClick();
+      el.modal.classList.remove('hidden');
+    });
+
+    el.closeModal.addEventListener('click', () => {
+      sfxClick();
+      el.modal.classList.add('hidden');
+    });
+
+    el.modal.addEventListener('click', (e) => {
+      if (e.target === el.modal) el.modal.classList.add('hidden');
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') el.modal.classList.add('hidden');
+      if (!state.running) return;
+      if (state.locked) return;
+      const map = { '1': 0, '2': 1, '3': 2, '4': 3, 'a': 0, 'b': 1, 'c': 2, 'd': 3 };
+      const k = e.key.toLowerCase();
+      if (k in map) choose(map[k]);
+    });
+
+    // initial confetti canvas
+    resizeConfetti();
+  </script>
+</body>
+</html>
